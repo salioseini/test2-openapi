@@ -1,0 +1,208 @@
+- lang: java
+  label: Java
+  source: |-
+    // Exemple de code Java pour envoyer la recherche de statut d'une demande de virement
+
+    import java.io.FileInputStream;
+    import java.io.IOException;
+    import java.net.URI;
+    import java.net.http.HttpClient;
+    import java.net.http.HttpRequest;
+    import java.net.http.HttpResponse.BodyHandlers;
+    import java.security.KeyManagementException;
+    import java.security.KeyStore;
+    import java.security.KeyStoreException;
+    import java.security.NoSuchAlgorithmException;
+    import java.security.UnrecoverableKeyException;
+    import java.security.cert.CertificateException;
+
+    import javax.net.ssl.SSLContext;
+
+    import org.apache.http.ssl.SSLContexts;
+
+    import java.net.http.HttpResponse;
+
+    public class Test {
+
+        public static void main(String[] args) throws Exception {
+            String url = "https://api.test.pi-bceao.com/spi/v1/transferts/statuts";
+            String keystorePath = "/path/to/keystore.p12";
+            String keystorePassword = "password";
+            String requestBody = "<RequestPayload xmlns=\"urn:bceao:pi:xsd:payload.1.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"urn:bceao:pi:xsd:payload.1.0.0 ../xsd/pi.payload.1.0.0.xsd\"> ... </RequestPayload>";
+
+            HttpClient client = HttpClient.newBuilder()//
+                    .sslContext(getSSLContext(keystorePath, keystorePassword)) //
+                    .version(HttpClient.Version.HTTP_2)
+                    .build();
+
+            // Creer la requête POST
+            HttpRequest postrequest = HttpRequest.newBuilder()
+                    .uri(new URI(url))
+                    .headers("Content-Type", "application/xml")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            // Envoyer la requête
+            HttpResponse<String> response = client.send(postrequest, BodyHandlers.ofString());
+            System.out.println(response.statusCode());
+            System.out.println(response.body());
+
+
+        }
+
+        public static SSLContext getSSLContext(String keystorePath, String keystorePassword) throws KeyManagementException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, CertificateException, IOException {
+            // Chargement keystore
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            try (FileInputStream inputStream = new FileInputStream(keystorePath)) {
+                keyStore.load(inputStream, keystorePassword.toCharArray());
+            }
+
+            // Création SSL context
+            return SSLContexts.custom()
+                    .loadKeyMaterial(keyStore, keystorePassword.toCharArray())
+                    .build();
+        }
+    }
+
+- lang: javascript
+  label: Node.js
+  source: |-
+    // Exemple de code Node.js pour envoyer la recherche de statut d'une demande de virement
+    
+    const https = require('https');
+    const fs = require('fs');
+    const tls = require('tls');
+
+    const url = 'api.test.pi-bceao.com/spi/v1';
+    const endpoint= '/transferts/statuts';
+    const requestBody = "<RequestPayload xmlns=\"urn:bceao:pi:xsd:payload.1.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"urn:bceao:pi:xsd:payload.1.0.0 ../xsd/pi.payload.1.0.0.xsd\"> ... </RequestPayload>";
+
+    executeHttpsPostRequest(url, endpoint, requestBody, null)
+        .then((result) => {
+            console.log(result)
+        })
+        .catch((error) => {
+            console.error(error)
+        });
+
+    function executeHttpsPostRequest(url,endpoint, postData, options) {
+        /**
+        * Cette fonction exécute une requête HTTPS POST avec un contexte SSL(MTLS)
+        * 
+        * @param {string} url - L'URL à laquelle la demande doit être envoyée.
+        * @param {string} postData - Les données à envoyer dans le corps de la requête.
+        * @param {object} options - Les options à utiliser pour la requête.
+        * 
+        * @returns {Promise} - Une promise qui se résout avec les données de la réponse ou qui se rejette avec une erreur.
+        */
+        return new Promise((resolve, reject) => {
+            try {
+                // Chargement du keystore
+                const keystore = fs.readFileSync('path/to/certificate.keystore.pkcs12');
+
+                // Configuration les options du contexte SSL
+                const sslContext = tls.createSecureContext({
+                    pfx: keystore,
+                    passphrase: 'keystore_password'
+                });
+
+                // Configuration des options de la requête HTTPS
+                const httpsOptions = {
+                    hostname: url,
+                    port: 443,
+                    protocol: 'https:',
+                    path: endpoint,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/xml',
+                        'Content-Length': Buffer.byteLength(postData),
+                    },
+                    cert: keystore,
+                    key: keystore,
+                    passphrase: 'keystore_password',
+                    secureContext: sslContext,
+                    rejectUnauthorized: true,
+                    requestCert: true,
+                    agent: false
+                };
+
+                // Envoi de la requête HTTPS
+                const req = https.request(httpsOptions, (res) => {
+                    let data = '';
+                    res.on('data', (chunk) => {
+                        data += chunk;
+                    });
+                    res.on('end', () => {
+                        resolve(data);
+                    });
+                });
+
+                // Traitement des erreurs
+                req.on('error', (error) => {
+                    reject(error);
+                });
+
+                // Envoi des données de la requête
+                req.write(postData);
+                req.end();
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+- lang: python
+  label: Python
+  source: |-
+    # Exemple de code Python pour envoyer la recherche de statut d'une demande de virement
+    
+    import http.client
+    import ssl
+
+    def execute_https_post_request(url, endpoint, post_data, cert_file, key_file, headers):
+        try:
+            # Création d'un contexte SSL personnalisé
+            context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+
+            # Chargement du certificat client et de la clé privée
+            context.load_cert_chain(cert_file, key_file)
+
+            # Connexion au serveur en utilisant le contexte SSL personnalisé
+            conn = http.client.HTTPSConnection(url, context=context)
+
+            # Envoi de la requête POST avec MTLS
+            conn.request('POST', endpoint, body=post_data, headers=headers)
+
+            # Récupération de la réponse
+            return conn.getresponse().read().decode()
+            
+        except Exception as e:
+            print("Erreur survenue: ",e)
+            return None
+        finally:
+            # Fermeture de la connexion
+            conn.close()
+
+    # Chemin vers le fichier PEM contenant le certificat client
+    cert_file = './resources/mtls/SNB001.pem'
+
+    # Chemin vers le fichier PEM contenant la clé privée du client
+    key_file = './resources/mtls/private_key.pem'
+
+    # URL de l'endpoint
+    url = 'pi.api.pocs-bceao.com'
+
+    # La resource demandée
+    endpoint = '/transferts/statuts'
+
+    # Les entêtes
+    headers = {'Content-type': 'application/xml'}
+
+    # Données à envoyer dans la requête POST
+    data = '<RequestPayload xmlns=\"urn:bceao:pi:xsd:payload.1.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"urn:bceao:pi:xsd:payload.1.0.0 ../xsd/pi.payload.1.0.0.xsd\"> ... </RequestPayload>'
+
+    # Execution de la requête
+    result = execute_https_post_request(url,endpoint, data, cert_file, key_file, headers)
+
+    # Affichage du resultat de la requête
+    print(result)
+    

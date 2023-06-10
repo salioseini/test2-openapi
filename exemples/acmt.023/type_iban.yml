@@ -1,0 +1,68 @@
+value: |
+  <RequestPayload xmlns="urn:bceao:pi:xsd:payload.1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:bceao:pi:xsd:payload.1.0.0 ../xsd/pi.payload.1.0.0.xsd">
+    <AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.03">
+      <Fr>
+        <FIId>
+          <FinInstnId>
+            <Nm>PI</Nm>
+            <Othr>
+              <Id>PIUMOA</Id>
+            </Othr>
+          </FinInstnId>
+        </FIId>
+      </Fr>
+      <To>
+        <FIId>
+          <FinInstnId>
+            <Nm>PSP banque TG 005</Nm>
+            <Othr>
+              <Id>TGB005</Id>
+            </Othr>
+          </FinInstnId>
+        </FIId>
+      </To>
+      <BizMsgIdr>MPIUMOAoUUVMhtGwtcHdmyomo9aHZ1cqk77</BizMsgIdr>
+      <MsgDefIdr>camt.014.001.05</MsgDefIdr>
+      <CreDt>2023-02-10T08:30:13.211Z</CreDt>
+      <Sgntr></Sgntr>
+    </AppHdr>
+    <Document xmlns="urn:iso:std:iso:20022:tech:xsd:acmt.023.001.03">
+      <IdVrfctnReq>
+        <Assgnmt>
+          <MsgId>MSNB001nXydyOl7iIZSKdzEGZfWcWBaB6bY</MsgId>
+          <CreDtTm>2023-02-21T15:30:00.250Z</CreDtTm>
+          <Assgnr>
+            <Agt>
+              <FinInstnId>
+                <Nm>PSP Banque SN 001</Nm>
+                <Othr>
+                  <Id>SNB001</Id>
+                </Othr>
+              </FinInstnId>
+            </Agt>
+          </Assgnr>
+          <Assgne>
+            <Agt>
+              <FinInstnId>
+                <Nm>PSP Banque CI 030</Nm>
+                <Othr>
+                  <Id>CIB030</Id>
+                </Othr>
+              </FinInstnId>
+            </Agt>
+          </Assgne>
+        </Assgnmt>
+        <Vrfctn>
+          <Id>ESNB00120230221153554KXvozkpNvhUk9e</Id>
+          <PtyAndAcctId>
+            <Acct>
+              <Id>
+                <IBAN>CI0110568943000003122583</IBAN>
+              </Id>
+            </Acct>
+          </PtyAndAcctId>
+        </Vrfctn>
+      </IdVrfctnReq>
+    </Document>
+  </RequestPayload>

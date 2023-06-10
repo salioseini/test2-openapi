@@ -1,0 +1,1914 @@
+openapi: 3.0.3
+info:
+  title: DOCUMENTATION API SPI
+  description: |-
+
+    # Généralités
+    PI-SPI gère les opérations de virement, de paiement, de règlement et de gestion des comptes des participants.
+
+    L'API-SPI suit les principes fondamentaux d'une `API REST`, mais diffère d'une `API REST` classique dans le traitement de la demande du client. Chaque appel à l'API génère un message `(mis sur une file d'attente de messages)` et retourne en réponse l'identifiant du message créé dans l’entête `Location` et la date de réception du message dans l’entête `Date` à l’exception de l’opération de vérification du statut d’un virement effectuée à l’expiration du transfert.
+
+    La communication entre un participant et le système SPI se fait à travers des appels d’API à l'aide de requêtes `HTTP`. Toutes les communications doivent être sécurisées en utilisant `HTTPs (HTTP sur TLS8)` tel que décrit dans le document des exigences de sécurité 4 de PI
+
+    ## Gestion des versions 
+
+    La stratégie de développement de l'API est de maintenir la rétrocompatibilité entre l'API et ses ressources et services dans la mesure du possible.
+    Les APIs de PI utilisent la spécification `SemVer12 (La gestion sémantique de versions)`; en ce sens, les modifications compatibles ne doivent pas générer une nouvelle version majeure.
+
+    La version de l’API utilise ainsi le format` MAJEUR.MINEUR.CORRECTIF`
+    * le numéro de version `MAJEUR` quand il y a des changements non rétrocompatibles,
+    * le numéro de version `MINEUR` quand il y a des ajouts de fonctionnalités rétrocompatibles,
+    * le numéro de version de `CORRECTIF` quand il y a des corrections d’anomalies rétrocompatibles.
+
+    Chaque fois qu'un changement dans ce document définissant les caractéristiques de l'API est mis à jour et affecte d'une manière ou d'une autre un service d'API, une nouvelle version de l’API sera publiée.
+    La version initiale de chaque API est `1.0.0`.
+    ### `1) Versions de correction `
+    L’identifiant de version de correction est  incrémenté si des corrections rétrocompatibles sont introduites. Une correction est définie comme un changement interne qui corrige un comportement incorrect.
+    ### `2) Versions mineurs `
+    Certaines modifications n'affectent pas la version de la ressource API; par exemple, si l'ordre des paramètres dans une requête change.
+
+    La liste suivante décrit quelques modifications considérées comme rétrocompatibles. Les participants doivent implémenter leur système de manière à ce que les services d'API prennent automatiquement en charge ces modifications sans interrompre le fonctionnement du système:
+    * paramètres de requêtes facultatifs
+    * ajout de nouveaux codes d'erreur
+
+    Ces types de modifications affectent la version mineure du service d'API.
+    ### `3) Versions majeurs`
+    La liste suivante décrit les modifications considérées comme rétro-incompatibles si la modification affecte un service d'API connecté à une ressource. Les intégrateurs d'API n'ont pas besoin d'implémenter de manière à prendre automatiquement en charge ces modifications. 
+    En effet, pour des changements importants, un plan de migration sera défini et dépendra de la nature de ces changements.
+    Les situations suivantes peuvent entraîner la publication d’une version majeure:
+    * Paramètres obligatoires supprimés ou ajoutés à une requête
+    * Paramètres facultatifs changés en obligatoires dans une requête 
+    * Paramètres renommés
+    * Types de données modifiés
+    * La logique métier d’un service modifiée
+    * Les URI de ressource/service d'API modifiées
+
+    Ces types de modifications affectent la version principale du service d'API. Veuillez noter que la liste n'est pas exhaustive ; il peut également y avoir d'autres modifications susceptibles d'affecter la version principale du service d'API. 
+    ### `4) Informations de version`
+    La gestion des versions s’effectuera via le chemin URI qui consiste à inclure le numéro de version dans le chemin URI et permet de gérer facilement plusieurs versions parallèles de l’API.
+    Le numéro de version majeure sera inclus dans l’URL de l’API comme suit: __https://www.example.com/api/v1/products__
+
+
+    ## Gestion des erreurs 
+
+    En ce qui concerne les réponses notifiant une erreur, PI utilise le format décrit dans la `RFC 7807` qui décrit comment les API peuvent renvoyer des informations d'erreur de manière standardisée.  Une telle réponse contient les éléments suivants :
+    <table>
+      <tr>
+        <td><b>type</b></td>
+        <td>Le champ "type" est une URI unique qui identifie le type de problème. L’URI peut être relative.</td>
+      </tr>
+      <tr>
+        <td><b>title</b></td>
+        <td>Le champ "title"  fournit une description courte pour comprendre le problème. Il est identique pour le même type de problème.</td>
+      </tr>
+      <tr>
+        <td><b>detail</b></td>
+        <td>Le champ "detail" donne des explications sur le problème.</td>
+      </tr>
+      <tr>
+        <td><b>instance</b></td>
+        <td>Il indique une référence URI de ressource concernée par le problème. Il est optionnel.</td>
+      </tr>
+      <tr>
+        <td><b>status</b></td>
+        <td>Le champ "status" renvoie le code de statut HTTP qui a déclenché cette réponse. Ce champ est optionnel.</td>
+      </tr>
+    </table>
+
+    Pour donner des informations détaillées sur le problème, des extensions sont permises. Les extensions sont des champs additionnels qui peuvent figurer dans la réponse.
+
+    Ci-dessous un exemple de réponse en JSON et un exemple en XML:
+    <img src="./images/exemple-erreur-json.png" />
+    <img src="./images/exemple-erreur-xml.png" />
+
+    Ici, le problème `format-invalide` __(identifié par son type URI)__  indique la raison de l’erreur `400` retournée par le serveur lors de la création d’un client; deux extensions sont ajoutées: `typeClient` qui indique le __champ incorrect__, et `invalid-params` qui indiquent les __paramètres invalides et la raison d’invalidité__. 
+    Par ailleurs, l'URI de type d'un problème devrait référencer une page HTML expliquant comment résoudre le problème. Cependant des types prédéfinis existent: c’est le cas du type `about:blank` qui indique que __le problème n'a pas de sémantique supplémentaire au-delà de celle du code de statut HTTP__. Lorsque `about:blank` est utilisé, le champ `title` est le même que le libellé du statut HTTP comme montré dans l’exemple suivant:
+    <img src="./images/exemple-probleme.png" />
+
+    ## Recommandations 
+    __Il est recommandé pour les services API fréquemment utilisés, l'utilisation de connexions persistantes et pour les services API moins fréquemment utilisés, d'utiliser des connexions de courte durée.__
+
+    # Sécurité
+    La sécurité des systèmes de paiement est une préoccupation majeure. Les avancées technologiques rapides ont considérablement amélioré les services financiers, mais elles ont également accru les risques de sécurité. Les cyberattaques, les fraudes, les violations de données et les erreurs humaines peuvent avoir des conséquences financières et réputationnelles graves. 
+    
+    Pour faire face à ces menaces, plusieurs mesures de sécurité sont mises en place dans la __Plateforme d’Interopérabilité (PI).__
+
+    Le cryptage des échanges avec `TLS` constitue une exigence avec une authentification mutuelle obligatoire lors de l’établissement de la connexion TLS aux APIs de PI.  Pour garantir la non-répudiation, la __signature numérique__ des messages échangés est exigée. 
+
+    Les clés utilisées pour les processus de signature et de cryptage __doivent être certifiées par l’autorité de certification de la PKI__ spécifiquement mise en place pour le système PI.
+
+    ## Authentification
+    L'authentification `TLS à deux sens`, également appelée authentification `mutuelle TLS`, repose sur le partage mutuel des certificats publics entre les deux parties (__client__ et __serveur__) et sur la vérification/validation basée sur ces certificats.
+
+
+    Avec l’authentification mutuelle, l’API de PI présente son certificat `mTLS` au serveur du participant qui l’appelle. Le serveur du participant présente également son certificat client délivré par l'autorité de certification de PI.
+
+    Les étapes générales suivantes décrivent comment une connexion est établie et comment les données sont transférées entre un client et un serveur dans le cas de mTLS :
+
+    * Le client demande une ressource protégée via le protocole HTTPS et le processus de poignée de main SSL/TLS commence.
+    * Le serveur renvoie son certificat public au client.
+    * Le client vérifie/valide le certificat reçu. Le client vérifie le certificat via l'autorité de certification (CA) pour les certificats signés par une CA.
+    * Si le certificat du serveur est validé avec succès, le serveur demande le certificat du client.
+    * Le client fournit son certificat public au serveur.
+    * Le serveur vérifie/valide le certificat reçu. Le serveur vérifie le certificat via l'autorité de certification pour les certificats signés par une CA.
+    
+    Après l'achèvement du processus de poignée de main, le client et le serveur communiquent et transfèrent des données chiffrées avec les clés secrètes partagées entre les deux lors de la poignée de main.
+    <img src="./images/cinematique-mtls2.png" />
+
+    `Intégration du MTLS à une réquête`
+
+    __Java__
+    ```java
+    import java.io.FileInputStream;
+    import java.io.IOException;
+    import java.net.URI;
+    import java.net.http.HttpClient;
+    import java.net.http.HttpRequest;
+    import java.net.http.HttpResponse.BodyHandlers;
+    import java.security.KeyManagementException;
+    import java.security.KeyStore;
+    import java.security.KeyStoreException;
+    import java.security.NoSuchAlgorithmException;
+    import java.security.UnrecoverableKeyException;
+    import java.security.cert.CertificateException;
+
+    import javax.net.ssl.SSLContext;
+
+    import org.apache.http.ssl.SSLContexts;
+
+    import java.net.http.HttpResponse;
+
+    public class App {
+
+        public static void executeHttpsPostRequest(String url, String requestBody, String keystorePath,String keystorePassword) throws KeyStoreException, NoSuchAlgorithmException, IOException, InterruptedException, URISyntaxException, UnrecoverableKeyException, KeyManagementException, CertificateException {
+            // Chargement keystore
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            try (FileInputStream inputStream = new FileInputStream(keystorePath)) {
+                keyStore.load(inputStream, keystorePassword.toCharArray());
+            }
+
+            // Création SSL context
+            SSLContext sslContext = SSLContexts.custom()
+                    .loadKeyMaterial(keyStore, keystorePassword.toCharArray())
+                    .build();
+
+            HttpClient client = HttpClient.newBuilder()//
+                    .sslContext(sslContext) //
+                    .version(HttpClient.Version.HTTP_2)
+                    .build();
+
+            // Création de la requête POST
+            HttpRequest postrequest = HttpRequest.newBuilder()
+                    .uri(new URI(url))
+                    .headers("Content-Type", "application/xml")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            // Envoi de la requête
+            HttpResponse<String> response = client.send(postrequest, BodyHandlers.ofString());
+            System.out.println(response.statusCode());
+            System.out.println(response.body());
+        }
+
+    }
+    ````
+
+    __Node.js__
+    ```javascript
+    const https = require('https');
+    const fs = require('fs');
+    const tls = require('tls');
+
+    function executeHttpsPostRequest(url,endpoint, postData, options) {
+        /**
+        * Cette fonction exécute une requête HTTPS POST avec un contexte SSL(MTLS)
+        * 
+        * @param {string} url - L'URL à laquelle la demande doit être envoyée.
+        * @param {string} postData - Les données à envoyer dans le corps de la requête.
+        * @param {object} options - Les options à utiliser pour la requête.
+        * 
+        * @returns {Promise} - Une promise qui se résout avec les données de la réponse ou qui se rejette avec une erreur.
+        */
+        return new Promise((resolve, reject) => {
+            try {
+                // Chargement du keystore
+                const keystore = fs.readFileSync('path/to/certificate.keystore.pkcs12');
+
+                // Configuration les options du contexte SSL
+                const sslContext = tls.createSecureContext({
+                    pfx: keystore,
+                    passphrase: 'keystore_password'
+                });
+
+                // Configuration des options de la requête HTTPS
+                const httpsOptions = {
+                    hostname: url,
+                    port: 443,
+                    protocol: 'https:',
+                    path: endpoint,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/xml',
+                        'Content-Length': Buffer.byteLength(postData),
+                    },
+                    cert: keystore,
+                    key: keystore,
+                    passphrase: 'keystore_password',
+                    secureContext: sslContext,
+                    rejectUnauthorized: true,
+                    requestCert: true,
+                    agent: false
+                };
+
+                // Envoi de la requête HTTPS
+                const req = https.request(httpsOptions, (res) => {
+                    let data = '';
+                    res.on('data', (chunk) => {
+                        data += chunk;
+                    });
+                    res.on('end', () => {
+                        resolve(data);
+                    });
+                });
+
+                // Traitement des erreurs
+                req.on('error', (error) => {
+                    reject(error);
+                });
+
+                // Envoi des données de la requête
+                req.write(postData);
+                req.end();
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+    ````
+
+    __Python__
+    ```python
+    import http.client
+    import ssl
+
+    def execute_https_post_request(url, endpoint, post_data, cert_file, key_file, headers):
+        try:
+            # Création d'un contexte SSL personnalisé
+            context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+
+            # Chargement du certificat client et de la clé privée
+            context.load_cert_chain(cert_file, key_file)
+
+            # Connexion au serveur en utilisant le contexte SSL personnalisé
+            conn = http.client.HTTPSConnection(url, context=context)
+
+            # Envoi de la requête POST avec MTLS
+            conn.request('POST', endpoint, body=post_data, headers=headers)
+
+            # Récupération de la réponse
+            return conn.getresponse().read().decode()
+            
+        except Exception as e:
+            print("Erreur survenue: ",e)
+            return None
+        finally:
+            # Fermeture de la connexion
+            conn.close()
+    ````
+    
+    ## Signature numérique
+    Afin de garantir l'`intégrité` et la `non-répudiation` des transactions, tous les messages transmis doivent être signés par le participant émetteur. 
+    Quelle que soit l'opération effectuée, la réponse au participant est toujours signée par PI.
+
+    ### `1) Signature des messages XML: XMLDsig`
+    
+    La norme `XMLDsig` fournit un format standard pour la signature des messages XML, qui peut être utilisé pour garantir l'authenticité et l'intégrité des messages échangés entre différents systèmes.
+    XMLDsig permet de signer un message XML en incluant une signature numérique dans le message lui-même. Cette signature numérique est calculée à l'aide d'un algorithme de hachage, qui produit une empreinte numérique du contenu du message. Cette empreinte est ensuite chiffrée à l'aide d'une clé privée, qui peut être vérifiée à l'aide de la clé publique correspondante.
+
+    #### `1.1) Structure de la signature`
+    Le tableau suivant explique les différents composants de la signature XML des messages ISO 20022:
+    <table>
+      <tr>
+        <th>Nom / Balise XML</th>
+        <th>Cardinalité</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td>&lt;Signature&gt;</td>
+        <td>[1..1]</td>
+        <td>±</td>
+        <td>Élément racine de la signature XMLDSig. Définit l'espace de noms, qui pointe vers l’URI du schéma XML à utiliser pour la signature numérique: http://www.w3.org/2000/09/xmldsig#</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&lt;SignedInfo&gt;</td>
+        <td>[1..1]</td>
+        <td>±</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&lt;CanonicalizationMethod&gt;</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Spécifie l'algorithme de canonisation à appliquer à l'élément, dans le but de générer la forme canonique du contenu. L'algorithme de canonisation doit être utilisé XMLexclusif: http://www.w3.org/2001/10/xml-exc-c14n#</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&lt;SignatureMethod&gt;</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Algorithme utilisé pour générer et valider la signature numérique. La valeur est toujours: http://www.w3.org/2001/04/xmldsig-more#rsa- sha256</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&lt;Reference&gt;</td>
+        <td>[1..3]</td>
+        <td>±</td>
+        <td>Permet de spécifier l'algorithme de synthèse (digest) utilisé pour signer l’objet de données, la Chaîne de transformations à appliquer avant de générer le digest.</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;URI(Attribut)</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Permet de spécifier les éléments spécifiques référencés</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Type(Attribut)</td>
+        <td>[0..1]</td>
+        <td>Max35Text</td>
+        <td>Type d’objet à signer</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&lt;Transforms&gt;</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Comprend une ou plusieurs balises &lt;Transform&gt;, qui indiquent quelles transformations doivent être appliquées</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Algorithm(Attribut)</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Algorithme de transformation utilisé, la valeur est toujours : http://www.w3.org/2001/10/xml-exc-c14n#</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&lt;DigestMethod&gt;</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Algorithme de synthèse qui sera appliqué au contenu à signer toujours: http://www.w3.org/2001/04/xmlenc#sha256.</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&lt;DigestValue&gt;</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Élément qui contient le résumé (digérer) codé en base64</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&lt;SignatureValue&gt;</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Élément qui contient la valeur de la signature encodée en base64</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&lt;KeyInfo&gt;</td>
+        <td>[1..1]</td>
+        <td>±</td>
+        <td>Élément qui contient les données du certificat utilisé pour signer numériquement le contenu. il comprend la balise &lt;X509Data&gt;</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&lt;X509Data&gt;</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Élément qui contient les données du certificat X509 utilisé par le signataire. il comprend la balise &lt;X509SubjectName&gt;</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;X509SubjectName&gt;</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Élément qui contient les informations sur le propriétaire du certificat</td>
+      </tr>
+      <tr>
+        <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;X509Certificate&gt;</td>
+        <td>[1..1]</td>
+        <td>Max35Text</td>
+        <td>Élément qui contient le certificat utilisé pour la signature du message</td>
+      </tr>
+    </table>
+    Pour la signature des message ISO 20022 échangées dans PI, 3 références doivent être calculées :
+    
+    * L'élément __Document__ 
+    * L’ élément d’entête ( __AppHdr__ ) en excluant les éléments de signature numérique (balise Sgntr)
+    * L’ élément __KeyInfo__ qui contient les informations sur le certificat
+
+    La procédure de signature des messages ISO 20022 est décrite de façon détaillée dans le Message User Guide (MUG) du BAH Header 9.
+
+    #### `1.2) Procédure de signature`
+    Le processus de création de la signature est indépendant du type de message xml et est décrit dans le diagramme suivant :  
+    <img src="./images/procedure-signature.png" />
+
+    ```xml
+    Exemple de signature XML:
+
+    <RequestPayload xmlns="urn:bceao:pisfn:xsd:env" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="payload.acmt023.xsd">
+    <AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.03">
+        <Fr>
+            <FIId>
+                <FinInstnId>
+                    <Nm>PSP Senegal 001</Nm>
+                    <Othr>
+                        <Id>SNB001</Id>
+                    </Othr>
+                </FinInstnId>
+            </FIId>
+        </Fr>
+        <To>
+            <FIId>
+                <FinInstnId>
+                    <Nm>PI</Nm>
+                    <Othr>
+                        <Id>PIUMOA</Id>
+                    </Othr>
+                </FinInstnId>
+            </FIId>
+        </To>
+        <BizMsgIdr>MSNB001Wi9C8V3Cxvp0yKZ3HNN3OymzGUvU</BizMsgIdr>
+        <MsgDefIdr>acmt.023.001.003</MsgDefIdr>
+        <CreDt>2023-04-14T08:08:59.988Z</CreDt>
+        <Sgntr>
+          <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+            <ds:SignedInfo>
+              <ds:CanonicalizationMethod  Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+              <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+              
+              <ds:Reference Type="http://www.w3.org/2000/09/xmldsig#KeyInfo" URI="#KEYINFOIDTOGENERATELATER">
+                <ds:Transforms>
+                  <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+                </ds:Transforms>
+                <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                <ds:DigestValue>RQnKYAP65A6pZIcqC3i2iz16ycsxegaGe0TY7bT+QXM=</ds:DigestValue>
+              </ds:Reference>
+
+              <ds:Reference>
+                <ds:Transforms>
+                  <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+                </ds:Transforms>
+                <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                <ds:DigestValue>MLPrXt3VpJ0szBcCocxx3NwAq2tELZGHKCZBQs1tOl8=</ds:DigestValue>
+              </ds:Reference>
+
+              <ds:Reference URI="">
+                <ds:Transforms>
+                  <ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+                <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms>
+                <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                <ds:DigestValue>sWM/pwy9hMBV0mfgS+CeHNFrY3f6fEIzDwenbv4O66A=</ds:DigestValue>
+              </ds:Reference>
+            </ds:SignedInfo>
+            <ds:SignatureValue>UzFiuBAhJKP3MCYkSYkS81apDJuZFyEsvp+3T3s+67fIc+GV7WgKQauHYeOfFruWZS9fC/ZlcxsD&#13;
+              0S/Sn9yj0NxDbgZgtFh8oXjAhFFiFunPhh+3X2cG9GK/eshYqYwa5vnjLDbPtKRYhEo+tzG24bD6&#13;
+              xuqd7y30W2GN/QuPPGrJZTy2+8m5/OAnIWeGj3A98XBe6y54REE7DC6P+idFWeL0I5oGPqJMoLSn&#13;
+              /9f3iJR/fUd3heXaQ8JG35o+WNbhuH1MtHQw+iZiUw88Rl82dOmpNVf1J3hgtJ3kk5gVdHm/fiye&#13;
+              NinRo3lauxRT/tS+cFBg3vYm6APELqIg6Wh0Bw==
+            </ds:SignatureValue>
+            <ds:KeyInfo Id="#KEYINFOIDTOGENERATELATER">
+              <ds:X509Data>
+                <ds:X509SubjectName>CN=SNB001,O=PSP Senegal 001,C=SN</ds:X509SubjectName>
+                <ds:X509Certificate>MIID4jCCAsqgAwIBAgIQPyFUAd1+K015p5OObTRLpDANBgkqhkiG9w0BAQsFADAzMQswCQYDVQQG&#13;
+                  EwJTTjEOMAwGA1UECgwFUElTRk4xFDASBgNVBAMMC1BJU0ZOLVNVQkNBMB4XDTIzMDIxNDE3MjU1&#13;
+                  M1oXDTI0MDMxNDE4MjU1M1owODELMAkGA1UEBhMCU04xGDAWBgNVBAoTD1BTUCBTZW5lZ2FsIDAw&#13;
+                  MTEPMA0GA1UEAxMGU05CMDAxMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkOGK1JTa&#13;
+                  M2Lia5Nj8w+1/yOOTVnop/nQGGHuths0sZhJKsXVo7q8gL3C/XEJC6FUFlo310CkFgTcfRvRSY44&#13;
+                  Hne6hzpLfJxUJdC9Vqbn7tC0PO18kdP+ElhQ0Xfe2vuZxZvx1ACaunPiCfdjqTLi46K9ke6DwWLJ&#13;
+                  /8+wSaUkMHxCUuP1Fx9DbpGS5NP312rSLwZz/EA8h6BEMdu2AQiBDSOr1wfaJCkMEcjTHY9W35q9&#13;
+                  OFqDVQ1VG46+94l4MOYJPWVJ4DodTXhVKHs13VeUl+QSBlUyhTp3luTOXeZC8M479phXjs/im5E6&#13;
+                  Qm1Mz9uNHXzDYvrIDfhWJZJ+c/q7NQIDAQABo4HsMIHpMAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAU&#13;
+                  deCwA+k/XeaRzxbDxs2c69Vk488wHQYDVR0OBBYEFOlL5YI4FpCAbBtQiFM20xervVyaMA4GA1Ud&#13;
+                  DwEB/wQEAwIHgDAWBgNVHSUBAf8EDDAKBggrBgEFBQcDAzB0BgNVHR8EbTBrMGmgZ6BlhmNodHRw&#13;
+                  Oi8vcGlzZm4tcGtpLWNhLXN1Yi1jcmwuczMuZXUtd2VzdC0xLmFtYXpvbmF3cy5jb20vY3JsLzE3&#13;
+                  MmY4ZDc4LTZkN2YtNGY0OS1iZTk1LTYzNDAyMjg3YjRkYy5jcmwwDQYJKoZIhvcNAQELBQADggEB&#13;
+                  AKaNdenv2713vmB3iCRjLwCdvmLIf0R/cjlBxmVO95pys/YnAcK1faCEh3r2rC5uTmZwbQ+vx6Ur&#13;
+                  zqTxqK+W8JcM+ynvlQ0zGgXuqDCtQT11UUT7m1ffY/oGLCO/9eWFWlgGnl1fIBurklTqV1/G+iEX&#13;
+                  Q8zd29Ai+fur1+7d+IlYmmaNhXUTVBWRTQplMnvjmBKtCnR+iSTyW7FPsSYsbWj/16/OK/9bPjAc&#13;
+                  ELLgnnUZCM0CCC8P3KBG9HWDFp4bhEoCvpcnRZvetlJFmEtQ3I0PyLCSQR6v/C0kMjRC4AP9P5kO&#13;
+                  NBPik2hTQ9vlbYpa1658foVJtT09L9a8Z6SteoE=
+                </ds:X509Certificate>
+              </ds:X509Data>
+            </ds:KeyInfo>
+          </ds:Signature>
+        </Sgntr>
+      </AppHdr>
+      <Document xmlns="urn:iso:std:iso:20022:tech:xsd:acmt.023.001.03">
+        <IdVrfctnReq>
+          <Assgnmt>
+            <MsgId>MSNB001Wi9C8V3Cxvp0yKZ3HNN3OymzGUvU</MsgId>
+            <CreDtTm>2023-04-14T08:08:59.982Z</CreDtTm>
+            <Assgnr>
+              <Agt>
+                <FinInstnId>
+                  <Nm>PSP Senegal 001</Nm>
+                  <Othr>
+                    <Id>SNB001</Id>
+                  </Othr>
+                </FinInstnId>
+              </Agt>
+            </Assgnr>
+            <Assgne>
+              <Agt>
+                <FinInstnId>
+                  <Nm>PSP CI 001</Nm>
+                  <Othr>
+                    <Id>CIC001</Id>
+                  </Othr>
+                </FinInstnId>
+              </Agt>
+            </Assgne>
+          </Assgnmt>
+          <Vrfctn>
+            <Id>ESNB00120230414080859XY02cQYbfcvmyf</Id>
+            <PtyAndAcctId>
+              <Pty>
+                <Nm>Fougnigue</Nm>
+                <CtryOfRes>CI</CtryOfRes>
+              </Pty>
+              <Acct>
+                <Id>
+                  <Othr>
+                    <Id>+221773393882</Id>
+                  </Othr>
+                </Id>
+              </Acct>
+            </PtyAndAcctId>
+          </Vrfctn>
+        </IdVrfctnReq>
+      </Document>
+    </RequestPayload>
+    ```
+    #### `1.3) Vérification de la signature`
+    Le processus de vérification de la signature numérique des messages est décrit dans le diagramme ci dessous :  
+    <img src="./images/verification-signature.png" />
+
+    ## Limitation des requêtes
+    L’algorithme du seau à jeton __(Token Bucket Algorithm)__ est utilisé pour effectuer la limitation des requêtes par participant. C’est une technique utilisée pour la gestion de la bande passante et la régulation de la fréquence des requêtes.
+
+    Le fonctionnement de l'algorithme est comme suit : un seau est rempli de jetons à une certaine vitesse (débit) et chaque requête nécessite l'utilisation d'un certain nombre de jetons. 
+    Si le seau ne contient pas suffisamment de jetons pour une requête donnée, celle-ci est rejetée.
+    Pour un plan d’usage configuré comme suit:  
+    * __débit__: 3 requêtes par secondes: 
+    * __burst__: 9 requêtes maximum
+    
+    Chaque seconde, 3 nouveaux jetons sont ajoutés au seau, jusqu'à la limite maximale de 9 jetons. Tant que le taux de demande ne dépasse pas le taux de recharge de jetons, tout va bien. Cependant, si le participant envoie 4 requêtes par seconde, le seau commencera à s'épuiser de 1 jeton par seconde. Après 6 secondes, tous les jetons dans le seau sont épuisés et l’API retourne une erreur __429: Too Many Requests__
+
+  version: 0.0.1
+  x-logo:
+    url: 'https://bceao.int/themes/medianet/image/png/logo_fr.png'
+
+  contact:
+    email: contact@pi.bceao.com
+    url: 'https:/pi.bceao.com'
+  license:
+    name: SPI 0.0.1
+    url: '#'
+
+servers:
+  - url: https://api.test.pi-bceao.com/spi/v1
+
+## the default validator applied to endpoints
+
+
+# Define Endpoints
+paths:
+  /transferts:
+    post:
+      tags:
+        - Transferts
+      summary: Pour envoyer une demande de transfert de fonds
+      description: Envoyer un pacs.008 au SPI pour effectuer un transfert de fonds
+      operationId: envoyerTransfert
+      requestBody:
+        description: Message ISO 20022 pacs.008
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/MessagePacs008'
+            examples:
+              VIREMENT:
+                $ref: ./exemples/pacs.008/virement.yml
+              PAIEMENT:
+                $ref: ./exemples/pacs.008/paiement.yml
+        required: true
+      responses:
+        '201':
+          description: Message créé
+        '400':
+          $ref: "#/components/responses/FormatInvalide"
+        '401':
+          description: Autorisations manquantes
+      security:
+        - mutual_tls: []
+      x-code-samples:
+        $ref: ./codes/envoi-transfert.yml
+
+  /transferts/rapports:
+    post:
+      tags:
+        - Transferts
+      summary: Pour envoyer la reponse d'une demande de transfert de fonds
+      description: Envoyer un pacs.002 au SPI pour effectuer un transfert de fonds
+      operationId: envoyerRapportTransfert
+      requestBody:
+        description: Message ISO 20022 pacs.002
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/MessagePacs002'
+            examples:
+              AVIS_DEBIT:
+                $ref: ./exemples/pacs.002/avis_debit.yml
+              AVIS_CREDIT:
+                $ref: ./exemples/pacs.002/avis_credit.yml
+              MODIF_CODE_SERVIVE:
+                $ref: ./exemples/pacs.002/modif_code_service.yml
+              REJET:
+                $ref: ./exemples/pacs.002/rejet.yml
+        required: true
+      responses:
+        '201':
+          description: Message créé
+        '400':
+          $ref: "#/components/responses/FormatInvalide"
+        '401':
+          description: Autorisations manquantes
+      security:
+        - mutual_tls: []
+      x-code-samples:
+        $ref: ./codes/reponse-transfert.yml
+
+  /transferts/statuts:
+    post:
+      tags:
+        - Transferts
+      summary: Pour la recherche de statut d'une demande de virement
+      description: Envoyer un pacs.028 au SPI pour effectuer la recherche de statut
+      operationId: envoyerDemandeStatutTransfert
+      requestBody:
+        description: Message ISO 20022 pacs.028
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/MessagePacs028'
+            examples:
+              RECHERCHE_STATUT_VIREMENT:
+                $ref: ./exemples/pacs.028/recherche_statut_virement.yml
+        required: true
+      responses:
+        '200':
+          description: Message créé
+        '400':
+          $ref: "#/components/responses/FormatInvalide"
+        '401':
+          description: Autorisations manquantes
+      security:
+        - mutual_tls: []
+      x-code-samples:
+        $ref: ./codes/statut-transfert.yml
+
+  /verifications-identites:
+    post:
+      tags:
+        - Verifications-Identites
+      summary: Pour envoyer une demande de verification d'identité
+      description: Envoyer un acmt.023 au SPI pour effectuer la verification d'identité
+      operationId: envoyerVerificationIdentite
+      requestBody:
+        description: Message ISO 20022 acmt.023
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/MessageAcmt023'
+            examples:
+              VERIFICATION_IDENTITE_TYPE_OTHER:
+                $ref: ./exemples/acmt.023/type_other.yml
+              VERIFICATION_IDENTITE_TYPE_IBAN:
+                $ref: ./exemples/acmt.023/type_iban.yml
+        required: true
+      responses:
+        '201':
+          description: Message créé
+        '400':
+          $ref: "#/components/responses/FormatInvalide"
+        '401':
+          description: Autorisations manquantes
+      security:
+        - mutual_tls: []
+      x-code-samples:
+        $ref: ./codes/envoi-verification-identite.yml
+
+  /verifications-identites/rapports:
+    post:
+      tags:
+        - Verifications-Identites
+      summary: Pour envoyer la reponse d'une demande de verification d'identité
+      description: Envoyer un acmt.024 au SPI pour repondre à une verification d'identité
+      operationId: envoyerReponseVerificationIdentite
+      requestBody:
+        description: Message ISO 20022 acmt.024
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/MessageAcmt024'
+            examples:
+              REPONSE_VERIFICATION_IDENTITE_TYPE_OTHER:
+                $ref: ./exemples/acmt.024/reponse_type_other.yml
+              REPONSE_VERIFICATION_IDENTITE_TYPE_IBAN:
+                $ref: ./exemples/acmt.024/reponse_type_iban.yml
+              REJET_VERIFICATION_IDENTITE:
+                $ref: ./exemples/acmt.024/rejet.yml
+        required: true
+      responses:
+        '201':
+          description: Message créé
+        '400':
+          $ref: "#/components/responses/FormatInvalide"
+        '401':
+          description: Autorisations manquantes
+      security:
+        - mutual_tls: []
+      x-code-samples:
+        $ref: ./codes/reponse-verification-identite.yml
+
+  
+components:
+  # *********** SECURITY
+  securitySchemes:
+    mutual_tls:
+      type: mutualTLS
+      description: Utilisation d'une connexion sécurisée bidirectionnelle pour l'authentification des clients et le serveur.
+
+  # *********** SCHEMAS
+  schemas:
+
+    # pacs.0008
+    MessagePacs008:
+      type: object
+      required:
+        - RequestPayload
+      properties:
+        RequestPayload:
+          type: object
+          required:
+            - AppHdr
+            - Document  
+          properties:
+            '@xmlns':       # Namespace declaration
+              type: string
+              enum:
+                - urn:bceao:pi:xsd:payload.1.0.0
+            # BAH Header 
+            AppHdr:
+              $ref: "#/components/schemas/MessageAppHeader"
+            # Document
+            Document:
+              type: object
+              properties:
+                '@xmlns':       # Namespace declaration
+                  type: string
+                  enum:
+                    - urn:iso:std:iso:20022:tech:xsd:pacs.008.001.10
+                FIToFICstmrCdtTrf:
+                  type: object
+                  properties:
+                    # Group Header
+                    GrpHdr:
+                      type: object
+                      properties:
+                        MsgId:
+                          type: string
+                        CreDtTm:
+                          type: string
+                          format: date-time
+                        NbOfTxs:
+                          type: integer
+                          minimum: 1
+                          maximum: 1
+                        SttlmInf:
+                          type: object
+                          properties:
+                            SttlmMtd:
+                              $ref: "#/components/schemas/SettlementMethod1CodeCLRG"
+                      required:
+                        - MsgId
+                        - CreDtTm  
+                        - NbOfTxs
+                        - SttlmInf
+                    # CreditTransferTransaction
+                    CdtTrfTxInf:
+                      type: object
+                      properties:
+                        PmtId:
+                          type: object
+                          properties:
+                            EndToEndId:
+                              $ref: "#/components/schemas/EndToEndId"
+                          required:
+                            - EndToEndId
+                        PmtTpInf:
+                          type: object
+                          properties:
+                            SvcLvl:
+                              type: object
+                              properties:
+                                Prtry:
+                                  type: string
+                              required:
+                                - Prtry
+                            LclInstrm:
+                              type: object
+                              properties:
+                                Prtry:
+                                  type: string
+                              required:
+                                - Prtry
+                            CtgyPurp:
+                              type: object
+                              properties:
+                                Prtry:
+                                  type: string
+                              required:
+                                - Prtry
+                          required:
+                            - LclInstrm
+                            - CtgyPurp
+                        IntrBkSttlmAmt:
+                          $ref: "#/components/schemas/IntrBkSttlmAmt"
+                          # type: object
+                          # properties:
+                          #   Ccy:
+                          #     type: string
+                          #     xml:
+                          #       attribute: true
+                          #   valeur:
+                          #     type: integer
+                          #     min: 1
+                        AccptncDtTm:
+                          type: string
+                          format: date-time
+                        ChrgBr:
+                          $ref: "#/components/schemas/ChargeBearerType1CodeSLEV"
+                        Dbtr:
+                          $ref: "#/components/schemas/PartyIdentification135ClientPayeurOuPaye"
+                        DbtrAcct:
+                          $ref: "#/components/schemas/CashAccount"
+                        DbtrAgt:
+                          $ref: "#/components/schemas/BranchAndFinancialInstitutionIdentification6PSPPayeurOuPaye"
+                        CdtrAgt:
+                          $ref: "#/components/schemas/BranchAndFinancialInstitutionIdentification6PSPPayeurOuPaye"
+                        Cdtr:
+                          $ref: "#/components/schemas/PartyIdentification135ClientPayeurOuPaye"
+                        CdtrAcct:
+                          $ref: "#/components/schemas/CashAccountCreditor"
+                      required:
+                        - PmtId
+                        - PmtTpInf  
+                        - IntrBkSttlmAmt
+                        - AccptncDtTm  
+                        - ChrgBr
+                        - Dbtr
+                        - DbtrAcct
+                        - DbtrAgt
+                        - CdtrAgt
+                        - Cdtr
+                        - CdtrAcct
+                  required:
+                    - GrpHdr
+                    - CdtTrfTxInf
+              required:
+                - FIToFICstmrCdtTrf
+
+    # pacs.0002
+    MessagePacs002:
+      type: object
+      required:
+        - RequestPayload
+      properties:
+        RequestPayload:
+          type: object
+          required:
+            - AppHdr
+            - Document  
+          properties:
+            '@xmlns':       # Namespace declaration
+              type: string
+              enum:
+                - urn:bceao:pi:xsd:payload.1.0.0
+            # BAH Header 
+            AppHdr:
+              $ref: "#/components/schemas/MessageAppHeader"
+            # Document
+            Document:
+              type: object
+              properties:
+                '@xmlns':       # Namespace declaration
+                  type: string
+                  enum:
+                    - urn:iso:std:iso:20022:tech:xsd:pacs.002.001.12
+                FIToFIPmtStsRpt:
+                  type: object
+                  properties:
+                    # Group Header
+                    GrpHdr:
+                      type: object
+                      properties:
+                        MsgId:
+                          type: string
+                        CreDtTm:
+                          type: string
+                          format: date-time
+                      required:
+                        - MsgId
+                        - CreDtTm
+                    # CreditTransferTransaction
+                    TxInfAndSts:
+                      type: object
+                      properties:
+                        OrgnlGrpInf:
+                          type: object
+                          properties:
+                            OrgnlMsgId:
+                              type: string
+                            OrgnlMsgNmId:
+                              type: string
+                            OrgnlCreDtTm:
+                              type: string
+                          required:
+                            - EndToEndId
+                        OrgnlEndToEndId:
+                          type: string
+                        TxSts:
+                          type: string
+                          enum:
+                            - ACSP
+                            - RJCT
+                        Rsn:
+                          type: object
+                          properties:
+                            Cd:
+                              $ref: "#/components/schemas/Pacs002RejectRsnCd"
+                          required:
+                            - Cd
+                        AddtlInf:
+                          $ref: '#/components/schemas/Max105Text'
+                      anyOf:
+                        - required:
+                          - OrgnlGrpInf
+                          - OrgnlEndToEndId  
+                          - TxSts
+                        - required:
+                          - OrgnlGrpInf
+                          - OrgnlEndToEndId  
+                          - TxSts
+                          - Rsn
+                          - AddtlInf
+                      
+                  required:
+                    - GrpHdr
+                    - TxInfAndSts
+              required:
+                - FIToFIPmtStsRpt
+
+     # pacs.0002
+    MessagePacs028:
+      type: object
+      required:
+        - RequestPayload
+      properties:
+        RequestPayload:
+          type: object
+          required:
+            - AppHdr
+            - Document  
+          properties:
+            '@xmlns':       # Namespace declaration
+              type: string
+              enum:
+                - urn:bceao:pi:xsd:payload.1.0.0
+            # BAH Header 
+            AppHdr:
+              $ref: "#/components/schemas/MessageAppHeader"
+            # Document
+            Document:
+              type: object
+              properties:
+                '@xmlns':       # Namespace declaration
+                  type: string
+                  enum:
+                    - urn:iso:std:iso:20022:tech:xsd:pacs.028.001.05
+                FIToFIPmtStsReq:
+                  type: object
+                  properties:
+                    # Group Header
+                    GrpHdr:
+                      type: object
+                      properties:
+                        MsgId:
+                          type: string
+                        CreDtTm:
+                          type: string
+                          format: date-time
+                      required:
+                        - MsgId
+                        - CreDtTm
+                    # CreditTransferTransaction
+                    TxInf:
+                      type: object
+                      properties:
+                        OrgnlEndToEndId:
+                          type: string
+                      required:
+                        - OrgnlEndToEndId
+                  required:
+                    - GrpHdr
+                    - TxInf
+              required:
+                - FIToFIPmtStsReq
+
+    # acmt.023
+    MessageAcmt023:
+      type: object
+      required:
+        - RequestPayload
+      properties:
+        RequestPayload:
+          type: object
+          required:
+            - AppHdr
+            - Document  
+          properties:
+            '@xmlns':       # Namespace declaration
+              type: string
+              enum:
+                - urn:bceao:pi:xsd:payload.1.0.0
+            # BAH Header 
+            AppHdr:
+              $ref: "#/components/schemas/MessageAppHeader"
+            # Document
+            Document:
+              type: object
+              properties:
+                '@xmlns':       # Namespace declaration
+                  type: string
+                  enum:
+                    - urn:iso:std:iso:20022:tech:xsd:acmt.023.001.03
+                IdVrfctnReq:
+                  type: object
+                  properties:
+                    Assgnmt:
+                      type: object
+                      properties:
+                        MsgId:
+                          type: string
+                        CreDtTm:
+                          type: string
+                          format: date-time
+                        # information assigner (payeur)
+                        Assgnr:
+                          type: object
+                          properties:
+                            Agt:
+                              type: object
+                              properties:
+                                FinInstnId:
+                                  $ref: "#/components/schemas/FinancialInstitutionIdentification18NmOthr"
+                              required:
+                                - FinInstnId
+                          required:
+                            - Agt 
+                        # information assigne (paye)
+                        Assgne:
+                          type: object
+                          properties:
+                            Agt:
+                              type: object
+                              properties:
+                                FinInstnId:
+                                  $ref: "#/components/schemas/FinancialInstitutionIdentification18NmOthr"
+                              required:
+                                - FinInstnId
+                          required:
+                            - Agt 
+                      required:
+                        - MsgId
+                        - CreDtTm
+                        - Assgnr
+                        - Assgne
+                    Vrfctn:
+                      type: object
+                      properties: 
+                        Id:
+                          type: string
+                        PtyAndAcctId:
+                          type: object
+                          properties:
+                            Acct:
+                              type: object
+                              properties:
+                                Id:
+                                  $ref: '#/components/schemas/AccountIdentification4Choice'
+                              required:
+                                - Id
+                          required:
+                            - Acct
+                      required:
+                        - Id
+                        - PtyAndAcctId
+                  required:
+                    - Assgnmt
+                    - Vrfctn
+              required:
+                - IdVrfctnReq    
+    
+    # acmt.024
+    MessageAcmt024:
+      type: object
+      required:
+        - RequestPayload
+      properties:
+        RequestPayload:
+          type: object
+          required:
+            - AppHdr
+            - Document  
+          properties:
+            '@xmlns':       # Namespace declaration
+              type: string
+              enum:
+                - urn:bceao:pi:xsd:payload.1.0.0
+            # BAH Header 
+            AppHdr:
+              $ref: "#/components/schemas/MessageAppHeader"
+            # Document
+            Document:
+              type: object
+              properties:
+                '@xmlns':       # Namespace declaration
+                  type: string
+                  enum:
+                    - urn:iso:std:iso:20022:tech:xsd:acmt.024.001.03
+                IdVrfctnRpt:
+                  type: object
+                  properties:
+                    Assgnmt:
+                      type: object
+                      properties:
+                        MsgId:
+                          type: string
+                        CreDtTm:
+                          type: string
+                          format: date-time
+                        # information assigner (payeur)
+                        Assgnr:
+                          type: object
+                          properties:
+                            Agt:
+                              type: object
+                              properties:
+                                FinInstnId:
+                                  $ref: "#/components/schemas/FinancialInstitutionIdentification18NmOthr"
+                              required:
+                                - FinInstnId
+                          required:
+                            - Agt 
+                        # information assigne (paye)
+                        Assgne:
+                          type: object
+                          properties:
+                            Agt:
+                              type: object
+                              properties:
+                                FinInstnId:
+                                  $ref: "#/components/schemas/FinancialInstitutionIdentification18NmOthr"
+                              required:
+                                - FinInstnId
+                          required:
+                            - Agt 
+                      required:
+                        - MsgId
+                        - CreDtTm
+                        - Assgnr
+                        - Assgne
+                    OrgnlAssgnmt:
+                      type: object
+                      properties:
+                        MsgId:
+                          type: string
+                    Rpt:
+                      type: object
+                      properties:
+                        OrgnlId: 
+                          type: string
+                        Vrfctn: 
+                          type: boolean
+                        Rsn:
+                          type: object
+                          properties: 
+                            Cd: 
+                              type: string
+                        UpdtdPtyAndAcctId:
+                          type: object
+                          properties: 
+                            Pty:
+                              $ref: '#/components/schemas/PartyIdentification135ClientPayeurOuPaye'
+                            Acct:
+                              $ref: '#/components/schemas/CashAccount40'
+                            Agt: 
+                              type: object
+                              properties:
+                                FinInstnId:
+                                  $ref: "#/components/schemas/FinancialInstitutionIdentification18NmOthr"
+                                BrnchId: 
+                                  type: object
+                                  properties: 
+                                    Id: 
+                                      type: string
+                              required:
+                                - FinInstnId
+                                - BrnchId
+                      anyOf:
+                        - required:
+                          - OrgnlId
+                          - Vrfctn
+                          - Rsn
+                        - required:
+                          - OrgnlId
+                          - Vrfctn
+                          - UpdtdPtyAndAcctId
+                  required:
+                    - Assgnmt
+                    - OrgnlAssgnmt
+                    - Rpt
+              required:
+                - IdVrfctnRpt    
+
+
+    # acmt.024 UpdtdPtyAndAcctId Acct
+    CashAccount40:
+      type: object
+      properties: 
+        Id:
+          $ref: '#/components/schemas/AccountIdentification4Choice'
+        Tp: 
+          type: object
+          properties: 
+            Cd:
+              type: string
+          required:
+            - Cd
+        Ccy: 
+          type: string
+        Nm: 
+          type: string
+      required:
+        - Id
+        - Tp
+        - Ccy
+        - Nm
+    # Devise XOF
+    CurrencyXOF:
+      type: string
+      enum:
+        - XOF
+    
+    IntrBkSttlmAmt:
+      type: object
+      properties:
+        Ccy:
+          type: string
+          xml:
+            attribute: true
+        value:
+          type: integer
+
+    # Country code 
+    CountryCodeUEMOA:
+      type: string
+      enum:
+        - CI
+        - SN
+        - ML
+        - GW
+        - BF
+        - NE
+        - BJ
+        - TG
+
+    # Max 35 Text: used by Id (Code Membre)
+    Max35Text:
+      type: string
+      minLength: 1
+      maxLength: 35
+      description: Specifies a character string with a maximum length of 35 characters.
+    
+    # Max 140 text: Nm in PSP Name
+    Max140Text:
+      type: string
+      minLength: 1
+      maxLength: 140
+      description: Specifies a character string with a maximum length of 140 characters.
+
+    # Max 2048 text: Used By Proxy
+    Max2048Text:
+      type: string
+      minLength: 1
+      maxLength: 2048
+      description: Specifies a character string with a maximum length of 2048 characters.
+    
+    Max105Text:
+      type: string
+      minLength: 1
+      maxLength: 105
+      description: Specifies a character string with a maximum length of 105 characters.
+
+    # Code Membre: Code Pays (2 positions) + Code type de participant (1 position) + Numéro ( 3 positions).
+    CodeMembre:
+      type: string
+      pattern: '^(CI|SN|ML|BF|BJ|TG|NE|GW)[BCDF]\d{3}$'
+      example: "SNB001"
+
+    # Message Identification: M (1) + CodeMembre (6) + UNIQUEID (28)  
+    MessageId:
+      type: string
+      pattern: '^M(CI|SN|ML|BF|BJ|TG|NE|GW)[BCDF]\d{3}[a-zA-Z0-9]{28}$'
+      example: "MSNB0011234567890POIUYTREZAQSDFGHJK"
+
+    # EndToEndId: E (1) + CodeMembre (6) + Date (20221121161834) (14) + UNIQUEID (14)   
+    EndToEndId:
+      type: string
+      pattern: '^E(CI|SN|ML|BF|BJ|TG|NE|GW)[BCDF]\d{3}\d{14}[a-zA-Z0-9]{14}$'
+      example: "ESNB00120221121161834ABCDFG78965412"
+    
+    # SettlementMethod1Code: 
+    SettlementMethod1CodeCLRG:
+      type: string
+      enum:
+        - CLRG
+
+    # Charge Bearer: SLEV
+    ChargeBearerType1CodeSLEV:
+      type: string
+      enum:
+        - SLEV
+    
+    # FinInstnId > Othr
+    GenericFinancialIdentification1:
+      type: object
+      properties:
+        Id:
+          $ref: '#/components/schemas/CodeMembre'
+      required:
+        - Id
+
+    # FinInstnId
+    FinancialInstitutionIdentification18NmOthr:
+      type: object
+      properties:
+        Nm:
+          $ref: "#/components/schemas/Max140Text"
+        Othr:
+          $ref: '#/components/schemas/GenericFinancialIdentification1'
+      required:
+        - Nm
+        - Othr
+
+    # BranchAndFinancialInstitutionIdentification6
+    MessageAppHeaderFr:
+      type: object
+      properties:
+        FinInstnId:
+          $ref: "#/components/schemas/FinancialInstitutionIdentification18NmOthr"
+      required:
+        - FinInstnId
+
+    # Party44Choice From or To in BAH headear
+    Party44ChoiceFr:
+      type: object
+      properties:
+        FIId:
+          $ref: "#/components/schemas/MessageAppHeaderFr"
+      required:
+        - FIId
+    
+    # To PI
+    Party44ChoiceToPI:
+      type: object
+      properties:
+        FIId:
+          type: object
+          properties:
+            FinInstnId:
+              type: object
+              properties:
+                Nm:
+                  type: string
+                  enum:
+                    - PI
+                Othr:
+                  type: object
+                  properties:
+                    Id:
+                      type: string
+                      enum:
+                        - PIUMOA
+                  required:
+                    - Id
+              required:
+                - Nm
+                - Othr
+          required:
+            - FinInstnId
+      required:
+        - FIId
+
+    # App Header
+    MessageAppHeader:
+      type: object
+      properties:
+        '@xmlns':       # Namespace declaration
+          type: string
+          enum:
+            - urn:iso:std:iso:20022:tech:xsd:head.001.001.03
+        Fr:
+          $ref: "#/components/schemas/Party44ChoiceFr"
+        To:
+          $ref: "#/components/schemas/Party44ChoiceToPI"
+        BizMsgIdr:
+          $ref: '#/components/schemas/MessageId'
+        MsgDefIdr:
+          type: string
+          enum:
+            - pacs.008.001.10
+        CreDt:
+          type: string
+          format: date-time
+      required:
+        - Fr
+        - To  
+        - BizMsgIdr
+        - MsgDefIdr  
+        - CreDt
+
+    # BranchAndFinancialInstitutionIdentification6
+    BranchAndFinancialInstitutionIdentification6PSPPayeurOuPaye:
+      type: object
+      properties:
+        FinInstnId:
+          $ref: "#/components/schemas/FinancialInstitutionIdentification18NmOthr"
+        BrnchId:
+          type: object
+          properties:
+            Id:
+              $ref: '#/components/schemas/Max35Text'
+      required:
+        - FinInstnId
+        - BrnchId
+    
+    # Types de comptes
+    ExternalCashAccountType1Code:
+      type: string
+      enum:
+        - CACC
+        - MCOD
+        - SHID
+      description: |
+        This endpoint returns a list of items.
+
+        | Column 1 | Column 2 |
+        | -------- | -------- |
+        | Row 1, Column 1 | Row 1, Column 2 |
+        | Row 2, Column 1 | Row 2, Column 2 |
+
+    # Account IBAN
+    IBAN2007Identifier:
+      type: object
+      description: International Bank Account Number (IBAN) - identifier used internationally by financial institutions to uniquely identify the account of a customer.
+      properties:
+        IBAN:
+          type: string
+    
+    # Account Othr
+    GenericAccountIdentification1:
+      type: object
+      description: Unique identification of an account, as assigned by the account servicer, using an identification scheme.
+      properties:
+        Othr:
+          type: object
+          properties:
+            Id:
+              type: string
+    
+    # Account > Proxy
+    ProxyAccountIdentification1:
+      type: object
+      description: Information related to a proxy  identification of the account.
+      properties:
+        Id:
+          $ref: '#/components/schemas/Max2048Text'
+        Tp:
+          type: object
+          properties:
+            Cd:
+              type: string
+              enum:
+                - SHID
+                - MBNO
+                - MCOD
+
+    # Account > Id
+    AccountIdentification4Choice:
+      type: object
+      description: Specifies the unique identification of an account as assigned by the account servicer.
+      oneOf:
+        - $ref: '#/components/schemas/IBAN2007Identifier'
+        - $ref: '#/components/schemas/GenericAccountIdentification1'
+
+    # Account General
+    CashAccount:
+      type: object
+      properties:
+        Id:
+          $ref: '#/components/schemas/AccountIdentification4Choice'
+        Tp:
+          type: object
+          properties:
+            Cd:
+              $ref: "#/components/schemas/ExternalCashAccountType1Code"
+        Ccy:
+          $ref: "#/components/schemas/CurrencyXOF"
+        
+      required:
+        - Id
+        - Tp
+        - Ccy                       
+      
+    # Account Creditor 
+    CashAccountCreditor:
+      allOf:    
+        - $ref: '#/components/schemas/CashAccount'
+        - type: object
+          properties:
+            Prxy:
+              $ref: "#/components/schemas/ProxyAccountIdentification1"
+    
+    # Postal address only "TownName" and "AddressLine"
+    PostalAddress24Client:
+      type: object
+      properties:
+        TownName:
+          $ref: '#/components/schemas/Max35Text'
+        AddressLine:
+          type: array
+          maxItems: 7
+          description: Information that locates and identifies a specific address, as defined by postal services, presented in free format text.
+          items:
+            type: string
+            maxLength: 70
+          
+    # Creditor or debtor client
+    PartyIdentification135ClientPayeurOuPaye:
+      type: object
+      properties:
+        Nm:
+          $ref: '#/components/schemas/Max140Text'
+        PstlAdr:
+           $ref: '#/components/schemas/PostalAddress24Client'
+        CtryOfRes:
+           $ref: '#/components/schemas/CountryCodeUEMOA'
+      required:
+        - Nm
+        - CtryOfRes
+    
+    # Problem RFC 7807
+    Problem7807:
+      type: object
+      properties:
+        type:
+          type: string
+          description: A URI reference that identifies the problem type
+          example: about:blank
+        title:
+          type: string
+          description: A short, human-readable summary of the problem
+          example: Bad Request
+        status:
+          type: integer
+          description: The HTTP status code for this occurrence of the problem
+          example: 400
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence of the problem
+          example: "122:0 Element '{urn:iso:std:iso:20022:tech:xsd:pacs.008.001.10}Id': [facet 'maxLength'] The value has a length of '36'; this exceeds the allowed maximum length of '34'."
+      xml:
+        name: problem
+        namespace: "urn:ietf:rfc:7807"
+    
+    # Country code 
+    Pacs002RejectRsnCd:
+      type: string
+      enum:
+        - AC03
+        - AC06
+        - AC07
+        - AC14
+        - AG01
+        - AM21
+        - BE01
+        - BE17
+        - FR01
+      description: |
+        - AC03: Le numéro de compte du payé est invalide
+        - AC06: Le compte spécifié est bloqué.
+        - AC07: Compte du payé clôturé
+        - AC14: Type de compte du payé invalide
+        - AG01: Transaction interdite sur ce type de compte.
+        - AM21: Le montant de la transaction dépasse les limites convenues entre la banque et le client.
+        - BE01: Le nom du client final n'est pas lié au numéro de compte associé.
+        - BE17: Code d'identification du payé ou du créditeur final manquant ou invalide
+        - FR01: Retourné à la suite d'une fraude.
+        - UPAY: Le paiement n'est pas justifié.
+
+  # *********** RESPONSES
+  responses:
+    FormatInvalide:
+      description: La requête est malformée
+      content:
+        application/problem+xml:
+          schema:
+            $ref: "#/components/schemas/Problem7807"
+          examples:
+            example:
+              $ref: "#/components/examples/Problem7807ExempleBadRequest"
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem7807"
+          examples:
+            exemple:
+              $ref: "#/components/examples/Problem7807ExempleBadRequest"
+        
+  # *********** EXEMPLES
+  examples:
+    # Probleme 7807
+    Problem7807ExempleBadRequest:
+      summary: "Problème format invalide"
+      value:
+        type: "about:blank"
+        title: "Bad Request"
+        status: 400
+        detail: "Format du message invalide"
+
+    # Virement P2P
+    Pacs002ExempleVirementReponsePositive:
+      summary: "Exemple de pacs.002 d'acceptation d'une demande de virement"
+      value:
+        AppHdr:
+          Fr:
+            FIId:
+              FinInstnId:
+                Nm: "PSP Banque SN 234"
+                Othr:
+                  Id: "SNB234"
+          To:
+            FIId:
+              FinInstnId:
+                Nm: "PI"
+                Othr:
+                  Id: "PIUMOA"
+          BizMsgIdr: "MSNB234nXAdyOl7iIZSKdzEGZfWcWBaV6a7"
+          MsgDefIdr: "pacs.002.001.12"
+          CreDt: "2023-02-21T15:30:00.950Z"
+        Document:
+          FIToFIPmtStsRpt:
+            GrpHdr:
+              MsgId: "MSNB234nXydyOl7iIZSKdzEGZfWcWBaB6bY"
+              CreDtTm: "2023-02-21T15:30:00.950Z"
+            TxInfAndSts:
+              OrgnlGrpInf:
+                OrgnlMsgId: "MPIUMOA9vydyOl7iIZSMdz3GZfWcWBa5896"
+                OrgnlMsgNmId: "pacs.008.001.10"
+                OrgnlCreDtTm: "2023-02-21T15:30:01.600Z"
+              OrgnlEndToEndId: "ESNB00120230221153554KXvozkpNvhUk9e"
+              TxSts: "ACSP"
+
+    # Virement P2P
+    Pacs002ExempleVirementReponseNegative:
+      summary: "Exemple de pacs.002 de rejet d'une demande de virement"
+      value:
+        AppHdr:
+          Fr:
+            FIId:
+              FinInstnId:
+                Nm: "PSP Banque SN 234"
+                Othr:
+                  Id: "SNB234"
+          To:
+            FIId:
+              FinInstnId:
+                Nm: "PI"
+                Othr:
+                  Id: "PIUMOA"
+          BizMsgIdr: "MSNB234nXAdyOl7iIZSKdzEGZfWcWBaV6a7"
+          MsgDefIdr: "pacs.002.001.12"
+          CreDt: "2023-02-21T15:30:00.950Z"
+        Document:
+          FIToFIPmtStsRpt:
+            GrpHdr:
+              MsgId: "MSNB234nXydyOl7iIZSKdzEGZfWcWBaB6bY"
+              CreDtTm: "2023-02-21T15:30:00.950Z"
+            TxInfAndSts:
+              OrgnlGrpInf:
+                OrgnlMsgId: "MPIUMOA9vydyOl7iIZSMdz3GZfWcWBa5896"
+                OrgnlMsgNmId: "pacs.008.001.10"
+                OrgnlCreDtTm: "2023-02-21T15:30:01.600Z"
+              OrgnlEndToEndId: "ESNB00120230221153554KXvozkpNvhUk9e"
+              TxSts: "RJCT"
+              Rsn:
+                Cd: "AC07"  
+              AddtlInf: "Le Compte du payé est clôturé"
+    
+    # Demande statut pacs.028
+    Pacs028ExempleVirementStatut:
+      summary: "Exemple de pacs.028 de demande de statut de virement"
+      value:
+        AppHdr:
+          Fr:
+            FIId:
+              FinInstnId:
+                Nm: "PSP Banque SN 234"
+                Othr:
+                  Id: "SNB234"
+          To:
+            FIId:
+              FinInstnId:
+                Nm: "PI"
+                Othr:
+                  Id: "PIUMOA"
+          BizMsgIdr: "MSNB234nXAdyOl7iIZSKdzEGZfWcWBaV6a7"
+          MsgDefIdr: "pacs.002.001.12"
+          CreDt: "2023-02-21T15:30:00.950Z"
+        Document:
+          FIToFIPmtStsReq:
+            GrpHdr:
+              MsgId: "MSNB234nXydyOl7iIZSKdzEGZfWcWBaB6bY"
+              CreDtTm: "2023-02-21T15:30:00.950Z"
+            TxInf:
+              OrgnlEndToEndId: "ESNB00120230221153554KXvozkpNvhUk9e"
+
+    # Acmt.023
+    Acmt023ExempleVerification:
+      summary: "Exemple de acmt.023 envoyé pour une verification d'identité"
+      value:
+        AppHdr:
+          Fr:
+            FIId:
+              FinInstnId:
+                Nm: "PSP Banque SN 001"
+                Othr:
+                  Id: "SNB001"
+          To:
+            FIId:
+              FinInstnId:
+                Nm: "PI"
+                Othr:
+                  Id: "PIUMOA"
+          BizMsgIdr: "MSNB001nXAdyOl7iIZSKdzEGZfWcWBaV6a7"
+          MsgDefIdr: "pacs.008.001.10"
+          CreDt: "2023-02-21T15:30:01.250Z"
+        Document:
+          IdVrfctnReq:
+            Assgnmt:
+              MsgId: "MSNB001nXydyOl7iIZSKdzEGZfWcWBaB6bY"
+              CreDtTm: "2023-02-21T15:35:54.362Z"
+              Assgnr:
+                Agt:
+                  FinInstnId:
+                    Nm: PSP Banque SN 001
+                    Othr:
+                      Id: SNB001
+              Assgne:
+                Agt:
+                  FinInstnId:
+                    Nm: PSP EME CI 001
+                    Othr:
+                      Id: CIC001
+            Vrfctn:
+              Id: ESNB00120230221153554KXvozkpNvhUk9e
+              PtyAndAcctId:
+                Pty:
+                  Nm: Mariama Traore
+                  CtryOfRes: CI
+                Acct: 
+                  Id:
+                    Othr:
+                      Id: +2250771299999
+
+    # Acmt.024 reponse positive
+    Acmt024ExempleVerificationReponsePositive:
+      summary: "Exemple reponse positive d'acmt.024 envoyé pour une verification d'identité"
+      value:
+        AppHdr:
+          Fr:
+            FIId:
+              FinInstnId:
+                Nm: "PSP Banque SN 001"
+                Othr:
+                  Id: "SNB001"
+          To:
+            FIId:
+              FinInstnId:
+                Nm: "PI"
+                Othr:
+                  Id: "PIUMOA"
+          BizMsgIdr: "MSNB001nXAdyOl7iIZSKdzEGZfWcWBaV6a7"
+          MsgDefIdr: "pacs.008.001.10"
+          CreDt: "2023-02-21T15:30:01.250Z"
+        Document:
+          IdVrfctnRpt:
+            Assgnmt:
+              MsgId: "MSNB001nXydyOl7iIZSKdzEGZfWcWBaB6bY"
+              CreDtTm: "2023-02-21T15:35:54.362Z"
+              Assgnr:
+                Agt:
+                  FinInstnId:
+                    Nm: PSP Banque SN 001
+                    Othr:
+                      Id: SNB001
+              Assgne:
+                Agt:
+                  FinInstnId:
+                    Nm: PSP EME CI 001
+                    Othr:
+                      Id: CIC001
+            OrgnlAssgnmt:
+              MsgId: MSNB001nXydyOl7iIZSKdzEGZfWcWBaB6bY
+            Rpt: 
+              OrgnlId: ESNB00120230221153554KXvozkpNvhUk9e
+              Vrfctn: true
+              UpdtdPtyAndAcctId: 
+                Pty: 
+                  Nm: Mariama Traore
+                  CtryOfRes: CI
+                Acct: 
+                  Id:
+                    Othr:
+                      Id: +2250771299999
+                  Tp: 
+                    Cd: TRAN
+                  Ccy: XOF
+                  Nm: P
+                Agt: 
+                  FinInstnId:
+                    Nm: PSP EME CI 001
+                    Othr:
+                      Id: CIC001    
+                  BrnchId: 
+                    Id: 00000     
+
+    # Acmt.024 reponse negative
+    Acmt024ExempleVerificationReponseNegative:
+      summary: "Exemple reponse Negative d'acmt.024 envoyé pour une verification d'identité"
+      value:
+        AppHdr:
+          Fr:
+            FIId:
+              FinInstnId:
+                Nm: "PSP Banque SN 001"
+                Othr:
+                  Id: "SNB001"
+          To:
+            FIId:
+              FinInstnId:
+                Nm: "PI"
+                Othr:
+                  Id: "PIUMOA"
+          BizMsgIdr: "MSNB001nXAdyOl7iIZSKdzEGZfWcWBaV6a7"
+          MsgDefIdr: "pacs.008.001.10"
+          CreDt: "2023-02-21T15:30:01.250Z"
+        Document:
+          IdVrfctnRpt:
+            Assgnmt:
+              MsgId: "MSNB001nXydyOl7iIZSKdzEGZfWcWBaB6bY"
+              CreDtTm: "2023-02-21T15:35:54.362Z"
+              Assgnr:
+                Agt:
+                  FinInstnId:
+                    Nm: PSP Banque SN 001
+                    Othr:
+                      Id: SNB001
+              Assgne:
+                Agt:
+                  FinInstnId:
+                    Nm: PSP EME CI 001
+                    Othr:
+                      Id: CIC001
+            OrgnlAssgnmt:
+              MsgId: MSNB001nXydyOl7iIZSKdzEGZfWcWBaB6bY
+            Rpt: 
+              OrgnlId: ESNB00120230221153554KXvozkpNvhUk9e
+              Vrfctn: false
+              Rsn: 
+                Cd: AC01
+

@@ -1,0 +1,52 @@
+value: |
+  <RequestPayload xmlns="urn:bceao:pi:xsd:payload.1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:bceao:pi:xsd:payload.1.0.0 ../xsd/pi.payload.1.0.0.xsd">
+    <AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.03">
+      <Fr>
+        <FIId>
+          <FinInstnId>
+            <Nm>PI</Nm>
+            <Othr>
+              <Id>PIUMOA</Id>
+            </Othr>
+          </FinInstnId>
+        </FIId>
+      </Fr>
+      <To>
+        <FIId>
+          <FinInstnId>
+            <Nm>PSP banque TG 005</Nm>
+            <Othr>
+              <Id>TGB005</Id>
+            </Othr>
+          </FinInstnId>
+        </FIId>
+      </To>
+      <BizMsgIdr>MPIUMOAoUUVMhtGwtcHdmyomo9aHZ1cqk77</BizMsgIdr>
+      <MsgDefIdr>camt.014.001.05</MsgDefIdr>
+      <CreDt>2023-02-10T08:30:13.211Z</CreDt>
+      <Sgntr></Sgntr>
+    </AppHdr>
+    <Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.002.001.12">
+      <FIToFIPmtStsRpt>
+        <GrpHdr>
+          <MsgId>MPIUMOAnXydyOl7iIZSKdzEGZfWcWBaB6bY</MsgId>
+          <CreDtTm>2023-02-21T15:36:00.150Z</CreDtTm>
+        </GrpHdr>
+        <TxInfAndSts>
+          <OrgnlGrpInf>
+            <OrgnlMsgId>MSNB001nXydyOl7iIZSKdzEGZfWcWBaB6bY</OrgnlMsgId>
+            <OrgnlMsgNmId>pacs.008.001.10</OrgnlMsgNmId>
+            <OrgnlCreDtTm>2023-02-21T15:35:58.205Z</OrgnlCreDtTm>
+          </OrgnlGrpInf>
+          <OrgnlEndToEndId>ESNB00120230208153623X7cQSIJnmLCBvm</OrgnlEndToEndId>
+          <TxSts>RJCT</TxSts>
+          <StsRsnInf>
+            <Rsn>
+              <Cd>AG11</Cd>
+            </Rsn>
+          </StsRsnInf>
+        </TxInfAndSts>
+      </FIToFIPmtStsRpt>
+    </Document>
+  </RequestPayload>
